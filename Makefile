@@ -1,6 +1,5 @@
 default:
-	nasm -f bin startup_loader.asm -o startup_loader.bin
-	nasm -f bin startup_kernel.asm -o startup_kernel.bin
-	cat startup_loader.bin > startup.img
-	cat startup_kernel.bin >> startup.img
+	nasm -f elf64 startup_loader.asm -o startup_loader.o
+	nasm -f elf64 startup_kernel.asm -o startup_kernel.o
+	ld -T startup.ld -o startup.img startup_loader.o startup_kernel.o
 	./padding startup.img 16384
