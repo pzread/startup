@@ -22,8 +22,9 @@
 %define GDT_SIZE	0x18
 
 %define PT_BASE		0x10000
+%define VFONT_BASE	0x7F000
 
-%define VMEM_BASE	0x500
+%define VMEM_ADDR	0x500
 
     global loader
     extern kernel
@@ -52,7 +53,7 @@ start:
     int 0x10
     mov ax,es
     mov ds,ax
-    mov ax,0x7F00
+    mov ax,VFONT_BASE >> 4
     mov es,ax
     mov si,bp
     xor di,di
@@ -99,9 +100,9 @@ start:
     int 0x10
 
     mov eax,[0x2000 + 0x28]	;PhysBasePtr
-    mov [VMEM_BASE],eax
+    mov [VMEM_ADDR],eax
     xor eax,eax
-    mov [VMEM_BASE + 4],eax
+    mov [VMEM_ADDR + 4],eax
 
     jmp .eloVMode
 .cloVMode:

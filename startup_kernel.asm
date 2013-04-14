@@ -13,12 +13,14 @@
 %define PT_BASE		0x10000
 %define STACK_TOP	0x40000000
 
-%define VMEM_BASE	0x500
-%define IOAPIC_BASE	0x508
-%define LAPIC_BASE	0x510
+%define VMEM_ADDR	0x500
+%define IOAPIC_ADDR	0x508
+%define LAPIC_ADDR	0x510
 %define MP_COUNT	0x518
 
     global kernel
+    extern video_drawtext
+    extern std_sprintf
 
     BITS 64
     section .data
@@ -34,8 +36,9 @@ idt_ptr:
     dw  0xFFF
     dq  0xC000
 
-msga:	db  '[Startup] Found 0 cpu(s)',0
-msgb:	db  '[Startup] Hello World',0
+outy:	dq  100
+fmta:	db  '[Startup] I am CPU %u',0
+fmtb:	db  '[Startup] Found %u cpu(s)',0
 
     section .text
 kernel:
@@ -203,18 +206,18 @@ kernel:
 .eloMADT:
     xor rax,rax
     mov eax,[rsi + 4]
-    mov [IOAPIC_BASE],rax	;Init I/O APIC register address
+    mov [IOAPIC_ADDR],rax	;Init I/O APIC register address
 
     xor rax,rax    
     mov rcx,0x1B
     rdmsr
     and eax,0xFFFFF000
-    mov [LAPIC_BASE],rax	;Init Local APIC register address
+    mov [LAPIC_ADDR],rax	;Init Local APIC register address
 
     call init_lapic
     sti				;Enable interrupt
 
-    mov rsi,[LAPIC_BASE]
+    mov rsi,[LAPIC_ADDR]
     mov word [MP_COUNT],1
     mov eax,0x0
     mov [rsi + 0x310],eax
@@ -233,19 +236,53 @@ kernel:
 	
 
 
+    mov rbp,rsp
+    sub rsp,0x80
 
-    mov eax,[MP_COUNT]
-    add eax,'0'
-    mov byte [msga + 16],al
-    mov rdi,100
-    mov rsi,100
-    mov rdx,msga
-    call drawtext
+    mov qword [rbp - 8],0
 
+    sub rsp,0x28
+    lea rdi,[rbp - 128]
+    mov rsi,fmta
+    lea rdx,[rbp - 8]
+    call std_sprintf 
+    add rsp,0x28
+
+    sub rsp,0x28
     mov rdi,100
-    mov rsi,118
-    mov rdx,msgb
-    call drawtext
+    mov rsi,18
+    lock xadd [outy],rsi
+    lea rdx,[rbp - 128]
+    call video_drawtext
+    add rsp,0x28
+
+    add rsp,0x80
+    mov rbp,rsp
+    sub rsp,0x80
+
+    xor rax,rax
+    mov ax,[MP_COUNT]
+    mov [rbp - 8],rax
+
+    sub rsp,0x28
+    lea rdi,[rbp - 128]
+    mov rsi,fmtb
+    lea rdx,[rbp - 8]
+    call std_sprintf 
+    add rsp,0x28
+
+    sub rsp,0x28
+    mov rdi,100
+    mov rsi,18
+    lock xadd [outy],rsi
+    lea rdx,[rbp - 128]
+    call video_drawtext
+    add rsp,0x28
+
+    add rsp,0x80
+
+
+
 
     jmp .end
 
@@ -271,7 +308,7 @@ setisr:
 
 isr_null:
     push rsi
-    mov rsi,[LAPIC_BASE]
+    mov rsi,[LAPIC_ADDR]
     mov dword [rsi + 0xB0],0x0	;Set EOI register
     pop rsi
     iretq
@@ -281,14 +318,14 @@ isr_spurious:
 
 isr_32:				;APIC Timer IRQ
     push rsi
-    mov rsi,[LAPIC_BASE]
+    mov rsi,[LAPIC_ADDR]
     mov dword [rsi + 0xB0],0x0	;Set EOI register
     pop rsi
     iretq
 
 isr_33:				;PS/2 Keyboard IRQ
     push rsi
-    mov rsi,[LAPIC_BASE]
+    mov rsi,[LAPIC_ADDR]
     mov dword [rsi + 0xB0],0x0	;Set EOI register
     pop rsi
     iretq
@@ -297,7 +334,7 @@ init_lapic:
     push rax
     push rsi
 
-    mov rsi,[LAPIC_BASE]	;Init Local APIC
+    mov rsi,[LAPIC_ADDR]	;Init Local APIC
     mov	dword [rsi + 0x80],0x0	;Set Task Priority Register
     mov eax,[rsi + 0xD0]	;Set Local destination register
     mov eax,0xFFFFFFFF
@@ -321,93 +358,6 @@ init_lapic:
     mov dword [rsi + 0x380],0x100000
 
     pop rsi
-    pop rax
-    ret
-
-    
-
-
-drawchar:
-    push rax
-    push rcx
-    push rdx
-    push rdi
-    push rsi
-    push r8
-    push r9
-    push r10
-    pushfq
-
-    mov r8,rdi
-    mov r9,rsi
-
-    mov rax,rdx
-    mov rcx,16
-    mul rcx
-    add rax,0x7F000
-    mov rsi,rax
-
-    mov rdi,[VMEM_BASE]
-    mov r10,rdi
-
-    mov rax,r9
-    mov rcx,1024
-    mul rcx
-    add rax,r8
-    mov rcx,3
-    mul rcx
-    add r10,rax
-    mov rdx,15
-.loY:
-    mov rcx,8
-    mov rdi,r10
-    mov al,[rsi]
-.loX:
-    bt ax,7
-    jnc .eifX
-    mov word [rdi],0xD9D9
-    mov byte [rdi + 2],0xD9
-.eifX:
-    add rdi,3
-    shl ax,1
-    loop .loX
-
-    add rsi,1
-    add r10,3072
-    dec rdx
-    test rdx,rdx
-    jnz .loY
-
-    popfq
-    pop r10
-    pop r9
-    pop r8
-    pop rsi
-    pop rdi
-    pop rdx
-    pop rcx
-    pop rax
-    ret
-
-drawtext:
-    push rax
-    push rdx
-    push rdi
-
-    mov rax,rdx
-    xor rdx,rdx
-.lo:
-    mov dl,[rax]
-    test dl,dl
-    jz .elo
-    call drawchar    
-    add rdi,8
-    inc rax
-    jmp .lo
-.elo:
-
-    pop rdi
-    pop rdx
     pop rax
     ret
 
@@ -446,14 +396,15 @@ apstart64:
 
     xor rdx,rdx
     mov dx,1
-    lock xadd [MP_COUNT],dx	;rdx = processor index
+    lock xadd [MP_COUNT],dx
+    mov r15,rdx			;r15 = processor index
 
-    mov rax,rdx
+    mov rax,r15
     shl rax,22			;Stack size 4MB
     mov rsp,STACK_TOP
     sub rsp,rax
     
-    mov ax,dx
+    mov rax,r15
     shl ax,4
     add ax,GDT_TSSD_BASE
     ltr	ax			;Load TSS
@@ -462,6 +413,36 @@ apstart64:
     
     call init_lapic
     sti				;Enable interrupt
+
+    hlt
+    
+
+
+
+    mov rbp,rsp
+    sub rsp,0x80
+
+    mov [rbp - 8],r15
+
+    sub rsp,0x28
+    lea rdi,[rbp - 128]
+    mov rsi,fmta
+    lea rdx,[rbp - 8]
+    call std_sprintf 
+    add rsp,0x28
+
+    sub rsp,0x28
+    mov rdi,100
+    mov rsi,18
+    lock xadd [outy],rsi
+    lea rdx,[rbp - 128]
+    call video_drawtext
+    add rsp,0x28
+
+    add rsp,0x80
+
+
+
 
 .end:
     hlt

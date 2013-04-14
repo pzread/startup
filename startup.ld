@@ -8,6 +8,7 @@ SECTIONS{
     .kernel 0x7E00:{
 	startup_kernel.o(.text)
 	startup_kernel.o(.data)
+	startup_lib.o(*)
     }
     .ap 0x9000:{
 	startup_kernel.o(.aptext)
