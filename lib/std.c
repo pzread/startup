@@ -1,5 +1,9 @@
-#define VMEM_ADDR 0x500
-#define VFONT_BASE 0x7F000
+#include<loader.h>
+
+#define vga_info ((struct vga_info*)VGA_INFO)
+
+static char *log_prefix = "[startup kernel] ";
+static int log_last_pos = 8;
 
 void video_drawchar(int x,int y,char c){
     int i;
@@ -9,11 +13,11 @@ void video_drawchar(int x,int y,char c){
     unsigned char *vchar;
     unsigned char data;
 
-    vmem = (unsigned char*)*(unsigned long*)VMEM_ADDR;
+    vmem = (unsigned char*)(unsigned long)vga_info->vmem_base;
     vchar = (unsigned char*)(VFONT_BASE + (unsigned long)c * 16UL);
 
     for(i = 0;i < 16;i++){
-	off = (x + (y + i) * 1024) * 3;
+	off = (x + (y + i) * vga_info->x_res) * 3;
 	data = vchar[i];
 	for(j = 0;j < 8;j++){
 	    if((data & 0x80) == 0){
@@ -80,4 +84,10 @@ void std_sprintf(char *str,char *fmt,unsigned long *args){
     }
 
     *str = '\0';
+}
+
+void log(char *msg){
+    video_drawtext(8,log_last_pos,log_prefix);
+    video_drawtext(8 + 8 * 17,log_last_pos,msg);
+    log_last_pos += 16;
 }
