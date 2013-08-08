@@ -1,7 +1,8 @@
 /*
 Memory Map
    
-0x500	    -	    0x510	VGA Info
+0x500	    -	    0x50F	VGA Info
+0x510	    -	    0xB10	MEM Info
 0x1000	    -	    0x77FF	TSS (104 * 256)
 0x7900	    -	    0x85FF	Loader (2KB stack + 2KB loader)
 0x8600	    -	    0xA5FF	Descriptor table (8 * 1024)
@@ -16,6 +17,7 @@ Memory Map
 
 #define MAX_PROCESSOR 256
 #define VGA_INFO 0x500
+#define MEM_INFO 0x510
 #define TSS_BASE 0x1000
 #define GDT_BASE 0x8600
 #define VFONT_BASE 0xB600
@@ -34,5 +36,16 @@ struct vga_info{
     unsigned int y_res;
     unsigned int bits;
 };
+struct mem_region{
+    unsigned long long base;
+    unsigned long long size;
+    unsigned int type;
+    unsigned int acpi;
+};
+struct mem_info{
+    unsigned char region_count;
+    struct mem_region region[64];
+};
+
 
 #pragma pack(pop)

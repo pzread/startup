@@ -5,6 +5,9 @@
 static char *log_prefix = "[startup kernel] ";
 static int log_last_pos = 8;
 
+static char digimap[16] = {'0','1','2','3','4','5','6','7','8','9',
+    'A','B','C','D','E','F'}; 
+
 void video_drawchar(int x,int y,char c){
     int i;
     int j;
@@ -51,7 +54,7 @@ void std_sreverse(char *str,int len){
 	str[len - i - 1] = tmp;
     }
 }
-void std_sprintf(char *str,char *fmt,unsigned long *args){
+void sprintf(char *str,char *fmt,unsigned long *args){
     int i;
     int j;
     int argi;
@@ -66,8 +69,21 @@ void std_sprintf(char *str,char *fmt,unsigned long *args){
 		u = args[argi];
 		i = 0;
 		do{
-		    str[i] = (u % 10) + '0';
+		    str[i] = digimap[u % 10];
 		    u = u / 10;
+		    i++;
+		}while(u > 0);
+		std_sreverse(str,i);
+
+		str += i;
+		fmt++;
+		argi++;
+	    }else if(*fmt == 'x'){
+		u = args[argi];
+		i = 0;
+		do{
+		    str[i] = digimap[u % 16];
+		    u = u / 16;
 		    i++;
 		}while(u > 0);
 		std_sreverse(str,i);

@@ -14,7 +14,7 @@ loader:
 
 kernel:
 	$(CC) $(CFLAGS) -m64 -c lib/std.c -o std.o
-	$(CC) $(CFLAGS) -m64 -c lib/mm.c -o mm.o
+	$(CC) $(CFLAGS) -m64 -c src/mm.c -o mm.o
 	$(CC) $(CFLAGS) -m64 -c src/kernel.c -o kernel.o
 	$(LD) -m elf_x86_64 -T kernel.ld -o kernel.img kernel.o std.o mm.o
 	$(PAD) kernel.img 16384

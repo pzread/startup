@@ -47,7 +47,7 @@ struct gdt_ptr{
     unsigned long long base;
 };
 
-static char *prefix = "[startup loader] ";
+/*static char *prefix = "[startup loader] ";
 
 static void puts(char *str){
     int i;
@@ -67,8 +67,33 @@ static void log(char *msg){
     puts(prefix);
     puts(msg);
     puts("\r\n");
-}
+}*/
 
+static void init_memory(void){
+    unsigned int next_entry;
+    struct mem_info *mem_info;
+
+    next_entry = 0;
+    mem_info = (struct mem_info*)MEM_INFO;
+    mem_info->region_count = 0;
+    do{
+	mem_info->region[mem_info->region_count].acpi = 1;
+
+	asm(
+	    "mov edi,%2\n"
+	    "mov eax,0xE820\n"	    
+	    "mov ebx,%0\n"
+	    "mov ecx,24\n"
+	    "mov edx,0x534D4150\n"
+	    "int 0x15\n"
+	    "mov %0,ebx\n"
+	:"=g"(next_entry)
+	:"0"(next_entry),"g"(&mem_info->region[mem_info->region_count])
+	:"eax","ebx","ecx","edx","edi");
+
+	mem_info->region_count += 1;
+    }while(next_entry != 0);
+}
 static void init_video(void){
     struct vbe_info_block vbe_info;
     unsigned short *mode_ptr;
@@ -115,7 +140,6 @@ static void init_video(void){
 	::"g"(mode | 0x4000):"eax","ebx");
 
     }else{
-	log("Video mode not found");
 	while(1);
     }
 
@@ -247,13 +271,16 @@ static void enter_long_mode(){
 }
 
 void main(){
-    log("Init video"); 
+    //log("Init memory");
+    init_memory();
+
+    //log("Init video"); 
     init_video();
 
-    log("Load kernel"); 
+    //log("Load kernel"); 
     init_kernel();
 
-    log("Enter long mode"); 
+    //log("Enter long mode"); 
     enter_long_mode();
 
     asm(

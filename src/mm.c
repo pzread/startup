@@ -1,5 +1,13 @@
+#include <loader.h>
+#include <std.h>
+
 #define NULL ((void*)0)
 #define ENOMEM 1
+#define PAGE_SIZE 0x200000UL
+#define PAGE_SHIFT 21UL
+
+#define PT_PAGEMAP 0x1E8000UL
+#define PT_PAGEMAP_SIZE 32768
 
 #define PT_TABLEMAP 0x1F0000UL
 #define PT_TABLEMAP_SIZE 65536
@@ -19,7 +27,7 @@
 
 static unsigned long table_idx_next = 0;
 
-void memset(void *dst,unsigned char value,unsigned long size){
+void memset(void *dst,char value,unsigned long size){
     int i;
     unsigned long long_value;
 
@@ -40,19 +48,54 @@ void memset(void *dst,unsigned char value,unsigned long size){
     }
 }
 int test_bit(void *dst,unsigned long off){
-    if(((unsigned char*)dst)[off / 8UL] & (1 << (off % 8UL))){
+    if(((unsigned char*)dst)[off >> 3UL] & (1 << (off & 7UL))){
 	return 1;
     }else{
 	return 0;
     }
 }
 void set_bit(void *dst,unsigned long off){
-    ((unsigned char*)dst)[off / 8UL] &= (1 << (off % 8UL));
+    ((unsigned char*)dst)[off >> 3UL] &= (1 << (off & 7UL));
 }
 void clear_bit(void *dst,unsigned long off){
-    ((unsigned char*)dst)[off / 8UL] &= (~(1 << (off % 8UL)));
+    ((unsigned char*)dst)[off >> 3UL] &= (~(1 << (off & 7UL)));
 }
 
+void init_page(void){
+    int i;
+
+    struct mem_info *mem_info;
+    unsigned long base;
+    unsigned long size;
+    unsigned long off;
+    int idx;
+    
+    memset((void*)PT_PAGEMAP,-1,PT_PAGEMAP_SIZE);
+
+    mem_info = (struct mem_info*)MEM_INFO;
+    for(i = 0;i < mem_info->region_count;i++){
+	if(mem_info->region[i].type == 1){
+	    base = mem_info->region[i].base;
+	    size = mem_info->region[i].size;
+	    off = base & (PAGE_SIZE - 1);
+	    if(off > 0){
+		if(size < off){
+		    continue;
+		}
+		base += (PAGE_SIZE - off);
+		size -= off;
+	    }
+
+	    idx = base >> PAGE_SHIFT;
+	    while(size >= PAGE_SIZE){
+		clear_bit((void*)PT_PAGEMAP,idx);
+
+		idx += 1;
+		size -= PAGE_SIZE;
+	    }
+	}
+    }
+}
 void init_table(void){
     memset((void*)PT_TABLEMAP,0,PT_TABLEMAP_SIZE);
     table_idx_next = 0;
@@ -133,12 +176,14 @@ int map_page(unsigned long dst,unsigned long src){
     return 0;
 }
 
+#define vga_info ((struct vga_info*)VGA_INFO)
 void init_mm(void){
+    init_page();
     init_table();
     alloc_table();  //Alloc PML table
 
     map_page(0,0);  //Init 4M
-    map_page(0x200000,0x200000);
+    map_page(PAGE_SIZE,PAGE_SIZE);
 
     asm(
 	"mov rax,%0\n"

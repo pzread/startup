@@ -7,8 +7,12 @@
 extern void init_mm(void);
 
 void main(void){
+    int i;
+    struct mem_info *mem_info;
+
     init_mm();
     map_page(vga_info->vmem_base,vga_info->vmem_base);
+
     log("Enter x86-64 long mode");
     log("Init memory management done");
     log("Video memory map done");

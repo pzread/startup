@@ -5,7 +5,9 @@ fn = sys.argv[1]
 size = int(sys.argv[2])
 
 fd = os.open(fn,os.O_WRONLY | os.O_APPEND)
-pad = size - os.fstat(fd).st_size
+fs = os.fstat(fd).st_size
+print fs
+pad = size - fs
 assert(pad >= 0)
 
 os.write(fd,b'0' * pad)
