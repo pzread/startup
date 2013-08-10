@@ -1,11 +1,12 @@
-#include <std.h>
-#include <loader.h>
-#include <mm.h>
+#include<std.h>
+#include<loader.h>
+#include<mm.h>
 
 #define vga_info ((struct vga_info*)VGA_INFO)
 
 extern void init_mm(void);
 
+__attribute__ ((section (".text")))
 void main(void){
     int i;
     struct mem_info *mem_info;

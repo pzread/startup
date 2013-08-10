@@ -1,9 +1,10 @@
 asm(".code16gcc\n");
+#define LOADER
 
 #include <loader.h>
 
-#define GET_WORDPTR(p,v) asm("push es\nmov edi,%1\nand edi,0xFFFF0000\nshr edi,4\nmov es,di\nmov edi,%1\nmov %0,WORD PTR es:[di]\npop es\n":"=g"(v):"g"(p):"edi")
-#define SET_DWORDPTR(p,v) asm("push es\nmov edi,%0\nand edi,0xFFFF0000\nshr edi,4\nmov es,di\nmov edi,%0\nmov DWORD PTR es:[di],%1\npop es\n"::"g"(p),"g"(v):"edi")
+#define GET_WORDPTR(p,v) asm volatile("push es\nmov edi,%1\nand edi,0xFFFF0000\nshr edi,4\nmov es,di\nmov edi,%1\nmov %0,WORD PTR es:[di]\npop es\n":"=g"(v):"g"(p):"edi")
+#define SET_DWORDPTR(p,v) asm volatile("push es\nmov edi,%0\nand edi,0xFFFF0000\nshr edi,4\nmov es,di\nmov edi,%0\nmov DWORD PTR es:[di],%1\npop es\n"::"g"(p),"g"(v):"edi")
 
 #pragma pack(1)
 struct vbe_info_block{
@@ -71,7 +72,7 @@ static void log(char *msg){
 
 static void init_memory(void){
     unsigned int next_entry;
-    struct mem_info *mem_info;
+    volatile struct mem_info *mem_info;
 
     next_entry = 0;
     mem_info = (struct mem_info*)MEM_INFO;
@@ -79,7 +80,7 @@ static void init_memory(void){
     do{
 	mem_info->region[mem_info->region_count].acpi = 1;
 
-	asm(
+	asm volatile(
 	    "mov edi,%2\n"
 	    "mov eax,0xE820\n"	    
 	    "mov ebx,%0\n"
@@ -89,7 +90,7 @@ static void init_memory(void){
 	    "mov %0,ebx\n"
 	:"=g"(next_entry)
 	:"0"(next_entry),"g"(&mem_info->region[mem_info->region_count])
-	:"eax","ebx","ecx","edx","edi");
+	:"eax","ebx","ecx","edx","edi","memory");
 
 	mem_info->region_count += 1;
     }while(next_entry != 0);
@@ -98,14 +99,14 @@ static void init_video(void){
     struct vbe_info_block vbe_info;
     unsigned short *mode_ptr;
     unsigned short mode;
-    struct mode_info_block mode_info;
-    struct vga_info *vga_info;
+    volatile struct mode_info_block mode_info;
+    volatile struct vga_info *vga_info;
 
-    asm(
+    asm volatile(
 	"mov ax,0x4F00\n"
 	"mov edi,%0\n"
 	"int 0x10\n"
-    ::"g"(&vbe_info):"eax","edi");
+    ::"g"(&vbe_info):"eax","edi","memory");
     
     mode_ptr = vbe_info.mode_ptr;
     while(1){
@@ -114,12 +115,12 @@ static void init_video(void){
 	    break;
 	}
 
-	asm(
+	asm volatile(
 	    "mov ax,0x4F01\n"
 	    "mov cx,%0\n"
 	    "mov edi,%1\n"
 	    "int 0x10\n"
-	::"g"(mode),"g"(&mode_info):"eax","ecx","edi");
+	::"g"(mode),"g"(&mode_info):"eax","ecx","edi","memory");
 	
 	if((mode_info.mode_attributes & 0x90) == 0x90 &&    //Graphics mode | Linear frame buffer mode
 	    mode_info.x_resolution >= 800 &&
@@ -133,7 +134,7 @@ static void init_video(void){
     }
 
     if(mode != 0xFFFF){
-	asm(
+	asm volatile(
 	    "mov ax,0x4F02\n"
 	    "mov ebx,%0\n"
 	    "int 0x10\n"
@@ -149,7 +150,7 @@ static void init_video(void){
     vga_info->y_res = mode_info.y_resolution;
     vga_info->bits = mode_info.bits_per_pixel;
 
-    asm(
+    asm volatile(
 	"push ebp\n"
 	"push ds\n"
 	"push es\n"
@@ -165,28 +166,26 @@ static void init_video(void){
 	"rep movsd\n"
 	"pop ds\n"
 	"pop ebp\n"
-    ::"i"(VFONT_BASE):"eax","ecx","edx","edi","esi");
+    ::"i"(VFONT_BASE):"eax","ecx","edx","edi","esi","memory");
 }
-
 static void init_kernel(){
-    struct disk_packet diskpack = {
+    volatile struct disk_packet diskpack = {
 	.size_of_packet = sizeof(struct disk_packet),
 	.reserved = 0,
 	.sectors = 32,
-	.offset = 0xF000,
-	.segment = 0,
+	.offset = 0,
+	.segment = 0x1000,
 	.lba = 5,
 	.flat = 0
     };
     
-    asm(
+    asm volatile(
 	"mov esi,%0\n"
 	"mov ah,0x42\n"
 	"mov dl,0x80\n"
 	"int 0x13\n"
     ::"g"(&diskpack):"eax","edx","esi");
 }
-
 static void enter_long_mode(){
     int i;
     int j;
@@ -201,7 +200,7 @@ static void enter_long_mode(){
     unsigned int *pdpte;
     unsigned int *pde;
 
-    struct gdt_ptr gdt_ptr;
+    volatile struct gdt_ptr gdt_ptr;
 
     iomap = (unsigned int*)IOMAP_BASE;
     for(i = 0;i < 2048;i++){
@@ -231,15 +230,25 @@ static void enter_long_mode(){
 	gdt[j + 1] = 0;
     }
 
-    pml = (unsigned int*)0x7D000;
-    pdpte = (unsigned int*)0x7E000;
-    pde = (unsigned int*)0x7F000;
+    pml = (unsigned int*)0x7B000;
+    pdpte = (unsigned int*)0x7C000;
+    pde = (unsigned int*)0x7D000;
     for(i = 0;i < 1024;i++){
 	SET_DWORDPTR(pml + i,0);
 	SET_DWORDPTR(pdpte + i,0);
 	SET_DWORDPTR(pde + i,0);
     }
-    SET_DWORDPTR(pml,0x7E000 | 0x3);
+    SET_DWORDPTR(pml,0x7C000 | 0x3);
+    SET_DWORDPTR(pdpte,0x7D000 | 0x3);
+    SET_DWORDPTR(pde,0x0 | 0x83);   //Init base ram
+    
+    pdpte = (unsigned int*)0x7E000;
+    pde = (unsigned int*)0x7F000;
+    for(i = 0;i < 1024;i++){
+	SET_DWORDPTR(pdpte + i,0);
+	SET_DWORDPTR(pde + i,0);
+    }
+    SET_DWORDPTR(pml + 256 * 2,0x7E000 | 0x3);
     SET_DWORDPTR(pdpte,0x7F000 | 0x3);
     SET_DWORDPTR(pde,0x0 | 0x83);   //Init 4MB ram
     SET_DWORDPTR(pde + 2,0x200000 | 0x83);
@@ -247,7 +256,7 @@ static void enter_long_mode(){
     gdt_ptr.limit = 24 + 16 * MAX_PROCESSOR - 1;
     gdt_ptr.base = GDT_BASE;
 
-    asm(
+    asm volatile(
 	"mov eax,%0\n"	//Load page table
 	"mov cr3,eax\n"
 	"mov eax,cr4\n"	//Enable PAE
@@ -270,21 +279,14 @@ static void enter_long_mode(){
     ::"g"(pml),"g"(&gdt_ptr),"i"(GDT_TSSD_BASE),"i"(GDT_DATA):"eax","ecx","edx");
 }
 
-void main(){
-    //log("Init memory");
+__attribute__ ((section (".text")))
+void main(void){
     init_memory();
-
-    //log("Init video"); 
     init_video();
-
-    //log("Load kernel"); 
     init_kernel();
-
-    //log("Enter long mode"); 
     enter_long_mode();
 
-    asm(
-	"mov sp,0x7E00\n"   //Init stack (2KB)
-	"jmp %0:0xF000\n"    //Start kernel
+    asm volatile(
+	"jmp %0:0x7DC0\n"   //Start kernel
     ::"i"(GDT_CODE):);
 }

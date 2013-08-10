@@ -18,7 +18,7 @@ entry:
     mov dl,0x80
     int 0x13
 
-    mov sp,0x7E00		    ;Init stack (2KB)
+    mov sp,0x7DC0		    ;Init stack (2KB)
     jmp 0x0000:main
 
 diskpack:
