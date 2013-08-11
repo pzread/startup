@@ -8,3 +8,4 @@
 #define KSTACK_AREA_END 0xA000000000000000UL
 
 extern int map_page(unsigned long dst,unsigned long src);
+extern void* kmalloc(unsigned long size);

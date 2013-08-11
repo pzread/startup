@@ -1,3 +1,4 @@
+#include<list.h>
 #include<bitop.h>
 #include<mm.h>
 #include<err.h>
@@ -23,8 +24,35 @@
 #define PT_PML_TABLE ((unsigned long*)PT_BASE)
 #define PT_SET_ENTRY(e,x,f) (e) = ((unsigned long)(x) & 0x7FFFFFFFF000UL) | (unsigned long)((f) | PT_FLAG_P)
 
+/*
+Memory Block
+
+#Tag
+#List_head
+#Payload
+#Tag
+
+Tag: Size + low 2bit for tag
+
+Memort Free list
+64B ~ 65536B,> 65536B
+*/
+
+#define MBLOCK_TAG_USED 0x1
+#define MBLOCK_TAG_CLOSE_USED 0x2
+
+struct mblock{
+    unsigned long tag;
+    struct list_head list;
+};
+
 static unsigned long page_idx_next;
 static unsigned long table_idx_next;
+
+static void *kheap_start;
+static void *kheap_end;
+
+static struct list_head mblock_free_list[12];
 
 void memset(void *dst,char value,unsigned long size){
     int i;
@@ -88,17 +116,17 @@ static void init_page(void){
 	}
     }
 }
-static void* alloc_page(void){
+static unsigned long alloc_page(void){
     unsigned long idx;
 
     idx = find_and_set_next_zero_bit((void*)PT_PAGEMAP,page_idx_next,
 	    PT_MAX_PAGE);
 
     if(idx < PT_MAX_PAGE){
-	return (void*)(idx * PAGE_SIZE);
+	return idx * PAGE_SIZE;
     }
 
-    return NULL;
+    return (unsigned long)-1;
 }
 
 static void init_table(void){
@@ -165,6 +193,33 @@ int map_page(unsigned long dst,unsigned long src){
     return 0;
 }
 
+static void init_kheap(void){
+    kheap_start = (void*)0xFFFF800000400000;
+    kheap_end = kheap_start;
+}
+static void* expend_kheap(unsigned long size){
+    void *ret = kheap_end;
+    unsigned long page;
+
+    if(size == 0){
+	return ret;
+    }
+    size = ((size - 1) & (~(PAGE_SIZE - 1))) + PAGE_SIZE;
+
+    while(size > 0){
+	page = alloc_page();
+	map_page((unsigned long)kheap_end,(unsigned long)page);
+
+	kheap_end += PAGE_SIZE;
+	size -= PAGE_SIZE;
+    }
+
+    return ret;
+}
+void* kmalloc(unsigned long size){
+    return expend_kheap(size);
+}
+
 void init_mm(void){
     init_page();
     init_table();
@@ -177,4 +232,6 @@ void init_mm(void){
 	"mov rax,%0\n"
 	"mov cr3,rax\n"
     ::"i"(PT_BASE & 0x7FFFFFFFF000UL):"rax","memory");
+
+    init_kheap();
 }
