@@ -1,3 +1,4 @@
+#include<std.h>
 #include<list.h>
 #include<bitop.h>
 #include<mm.h>
@@ -38,42 +39,25 @@ Memort Free list
 64B ~ 65536B,> 65536B
 */
 
-#define MBLOCK_TAG_USED 0x1
-#define MBLOCK_TAG_CLOSE_USED 0x2
-
 struct mblock{
     unsigned long tag;
     struct list_head list;
 };
+
+#define MBLOCK_SIZE (sizeof(struct mblock) + sizeof(unsigned long))
+#define MBLOCK_TAILTAG(block,size) \
+    (*(unsigned long*)(((char*)(block)) + (size) - sizeof(unsigned long)))
+#define MBLOCK_TAG_USED 0x1
+#define MBLOCK_TAG_CLOSE_USED 0x2
+#define MBLOCK_TAG_SIZE ~3UL
 
 static unsigned long page_idx_next;
 static unsigned long table_idx_next;
 
 static void *kheap_start;
 static void *kheap_end;
-
-static struct list_head mblock_free_list[12];
-
-void memset(void *dst,char value,unsigned long size){
-    int i;
-    unsigned long long_value;
-
-    long_value = 0;
-    for(i = 0;i < sizeof(unsigned long);i++){
-	long_value = long_value << sizeof(unsigned char);
-	long_value += (unsigned long)value;
-    }
-    while(size > sizeof(unsigned long)){
-	*(unsigned long*)dst = long_value;	
-	dst = ((unsigned long*)dst) + 1;
-	size -= sizeof(unsigned long);
-    }
-    while(size > 0){
-	*(unsigned char*)dst = value;
-	dst = ((unsigned char*)dst) + 1;
-	size -= sizeof(unsigned char);
-    }
-}
+static struct list_head kmem_free_list[16];
+static unsigned int kmem_free_size[15] = {64,128,256,512,1024,2048,4096,8192,16384,32768,65536,131072,262144,524288,1048576};
 
 static void init_page(void){
     int i;
@@ -193,11 +177,17 @@ int map_page(unsigned long dst,unsigned long src){
     return 0;
 }
 
-static void init_kheap(void){
+static void init_kmem(void){
+    int i;
+
     kheap_start = (void*)0xFFFF800000400000;
     kheap_end = kheap_start;
+
+    for(i = 0;i < 16;i++){
+	INIT_LIST_HEAD(kmem_free_list[i]);
+    }
 }
-static void* expend_kheap(unsigned long size){
+static void* expend_kheap(unsigned long size,unsigned long *ret_len){
     void *ret = kheap_end;
     unsigned long page;
 
@@ -205,6 +195,9 @@ static void* expend_kheap(unsigned long size){
 	return ret;
     }
     size = ((size - 1) & (~(PAGE_SIZE - 1))) + PAGE_SIZE;
+    if(ret_len != NULL){
+	*ret_len = size;
+    }
 
     while(size > 0){
 	page = alloc_page();
@@ -217,7 +210,57 @@ static void* expend_kheap(unsigned long size){
     return ret;
 }
 void* kmalloc(unsigned long size){
-    return expend_kheap(size);
+    int i;
+    int j;
+    unsigned long block_size;
+    struct list_head *free_head;
+    struct mblock *block;
+    int find_flag;
+
+    block_size = size + MBLOCK_SIZE;
+    for(i = 14;i >= 0;i--){
+	if(block_size > kmem_free_size[i]){
+	    break;
+	}
+    }
+    i += 1;
+
+    free_head = &kmem_free_list[i];
+    if(i < 15){
+	if(list_empty(free_head)){
+	    block_size = kmem_free_size[i];
+	    block = (struct mblock*)expend_kheap(PAGE_SIZE,NULL);
+
+	    for(j = (PAGE_SIZE / block_size) - 1;j >= 0;j--){
+		block->tag = block_size;
+		MBLOCK_TAILTAG(block,block_size) = block_size;
+		list_add(&block->list,free_head);
+
+		block = (struct mblock*)(((char*)block) + block_size);
+	    }
+	}
+
+	block = container_of(free_head->next,struct mblock,list);
+	block->tag |= MBLOCK_TAG_USED;
+	MBLOCK_TAILTAG(block,block_size) = block->tag;
+	list_del(free_head->next);
+    }else{
+	block = NULL;
+	find_flag = 0;
+	list_for_each_entry(block,free_head,list){
+	    if((block->tag & MBLOCK_TAG_SIZE) >= block_size){
+		find_flag = 1;
+		break;
+	    }
+	}
+	if(!find_flag){
+	    block = (struct mblock*)expend_kheap(block_size,&block_size);
+	    block->tag = block_size | MBLOCK_TAG_USED;
+	    MBLOCK_TAILTAG(block,block_size) = block->tag;
+	}
+    }
+
+    return (void*)(((char*)block) + sizeof(struct mblock));
 }
 
 void init_mm(void){
@@ -228,10 +271,10 @@ void init_mm(void){
     map_page(0xFFFF800000000000,0);  //Init 4M
     map_page(0xFFFF800000000000 + PAGE_SIZE,PAGE_SIZE);
 
-    asm volatile(
+    __asm__ __volatile__(
 	"mov rax,%0\n"
 	"mov cr3,rax\n"
     ::"i"(PT_BASE & 0x7FFFFFFFF000UL):"rax","memory");
 
-    init_kheap();
+    init_kmem();
 }

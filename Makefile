@@ -1,4 +1,4 @@
-CC = ~/gcc-test/bin/gcc
+CC = ~/devel/gcc/gcc/bin/gcc
 CFLAGS32 = -masm=intel -fno-builtin -fno-zero-initialized-in-bss -I include -O2
 CFLAGS = $(CFLAGS32) -mcmodel=large
 LD = ld
@@ -27,9 +27,10 @@ loader:
 	$(PAD) loader.img 2560 
 
 kernel:
-	$(CC) $(CFLAGS) -m64 -c lib/std.c -o std.o
 	$(CC) $(CFLAGS) -m64 -c lib/bitop.c -o bitop.o
+	$(CC) $(CFLAGS) -m64 -c lib/list.c -o list.o
+	$(CC) $(CFLAGS) -m64 -c lib/std.c -o std.o
 	$(CC) $(CFLAGS) -m64 -c src/mm.c -o mm.o
 	$(CC) $(CFLAGS) -m64 -c src/kernel.c -o kernel.o
-	$(LD) -m elf_x86_64 -T kernel.ld -o kernel.img kernel.o std.o bitop.o mm.o
+	$(LD) -m elf_x86_64 -T kernel.ld -o kernel.img kernel.o bitop.o list.o std.o mm.o
 	$(PAD) kernel.img 16384

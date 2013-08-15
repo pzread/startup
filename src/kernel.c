@@ -9,6 +9,7 @@ extern void init_mm(void);
 __attribute__ ((section (".text")))
 void main(void){
     char *test;
+    int i;
 
     init_mm();
     map_page(vga_info->vmem_base,vga_info->vmem_base);
@@ -17,10 +18,14 @@ void main(void){
     log("Init memory management done");
     log("Video memory map done");
 
-    test = (char*)kmalloc(1024);
-    test[0] = 'X';
-    test[1] = '\0';
-    log(test);
+    for(i = 0;i < 65536;i++){
+	test = (char*)kmalloc(i);
+	memset(test,1,i);
+	//log(test);
+    }
+    test = (char*)kmalloc(0x300000);
+    memset(test,1,0x300000);
+    log("Test kmem passed");
 
     while(1);
 }

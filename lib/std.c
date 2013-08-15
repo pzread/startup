@@ -8,6 +8,27 @@ static int log_last_pos = 8;
 static char digimap[16] = {'0','1','2','3','4','5','6','7','8','9',
     'A','B','C','D','E','F'}; 
 
+void memset(void *dst,char value,unsigned long size){
+    int i;
+    unsigned long long_value;
+
+    long_value = 0;
+    for(i = 0;i < sizeof(unsigned long);i++){
+	long_value = long_value << sizeof(unsigned char);
+	long_value += (unsigned long)value;
+    }
+    while(size > sizeof(unsigned long)){
+	*(unsigned long*)dst = long_value;	
+	dst = ((unsigned long*)dst) + 1;
+	size -= sizeof(unsigned long);
+    }
+    while(size > 0){
+	*(unsigned char*)dst = value;
+	dst = ((unsigned char*)dst) + 1;
+	size -= sizeof(unsigned char);
+    }
+}
+
 void video_drawchar(int x,int y,char c){
     int i;
     int j;
