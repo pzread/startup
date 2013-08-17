@@ -65,5 +65,4 @@ struct mem_info{
     struct mem_region region[64];
 };
 
-
 #pragma pack(pop)

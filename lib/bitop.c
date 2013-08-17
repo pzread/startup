@@ -8,7 +8,7 @@ int test_bit(void *dst,unsigned long off){
     }
 }
 void set_bit(void *dst,unsigned long off){
-    ((unsigned long*)dst)[off / BITS_PER_LONG] &= (1 << (off % BITS_PER_LONG));
+    ((unsigned long*)dst)[off / BITS_PER_LONG] |= (1 << (off % BITS_PER_LONG));
 }
 void clear_bit(void *dst,unsigned long off){
     ((unsigned long*)dst)[off / BITS_PER_LONG] &= ~(1 << (off % BITS_PER_LONG));

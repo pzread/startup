@@ -9,3 +9,4 @@
 
 extern int map_page(unsigned long dst,unsigned long src);
 extern void* kmalloc(unsigned long size);
+extern void kfree(void *ptr);

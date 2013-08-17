@@ -44,20 +44,28 @@ struct mblock{
     struct list_head list;
 };
 
-#define MBLOCK_SIZE (sizeof(struct mblock) + sizeof(unsigned long))
-#define MBLOCK_TAILTAG(block,size) \
-    (*(unsigned long*)(((char*)(block)) + (size) - sizeof(unsigned long)))
 #define MBLOCK_TAG_USED 0x1
-#define MBLOCK_TAG_CLOSE_USED 0x2
 #define MBLOCK_TAG_SIZE ~3UL
+
+#define MBLOCK_SIZE (sizeof(struct mblock) + sizeof(unsigned long))
+
+#define MBLOCK_TAILTAG(block) \
+    (*(unsigned long*)(((char*)(block)) + \
+    ((block)->tag & MBLOCK_TAG_SIZE) - sizeof(unsigned long)))
+
+#define MBLOCK_PREVTAG(block) \
+    (*(unsigned long*)(((char*)(block)) - sizeof(unsigned long)))
+
+#define MBLOCK_NEXTTAG(block) \
+    (*(unsigned long*)(((char*)(block)) + ((block)->tag & MBLOCK_TAG_SIZE)))
 
 static unsigned long page_idx_next;
 static unsigned long table_idx_next;
 
-static void *kheap_start;
-static void *kheap_end;
+static unsigned long kheap_start;
+static unsigned long kheap_end;
 static struct list_head kmem_free_list[16];
-static unsigned int kmem_free_size[15] = {64,128,256,512,1024,2048,4096,8192,16384,32768,65536,131072,262144,524288,1048576};
+static unsigned int kmem_free_size[15] = {0x40,0x80,0x100,0x200,0x400,0x800,0x1000,0x2000,0x4000,0x8000,0x10000,0x20000,0x40000,0x80000,0x100000};
 
 static void init_page(void){
     int i;
@@ -177,90 +185,151 @@ int map_page(unsigned long dst,unsigned long src){
     return 0;
 }
 
+static void* alloc_kheap(unsigned long size){
+    void *ret;
+    unsigned long page;
+    unsigned long end;
+
+    if(size == 0){
+	return ret;
+    }
+    size = ((size - 1UL) & (~15UL)) + 16UL;
+
+    end = kheap_start + size + sizeof(unsigned long);
+    while(kheap_end < end){
+	page = alloc_page();
+	map_page(kheap_end,(unsigned long)page);
+	kheap_end += PAGE_SIZE;
+    }
+
+    ret = (void*)kheap_start;
+    kheap_start += size;
+    *(unsigned long*)kheap_start = MBLOCK_TAG_USED;
+    
+    return ret;
+}
 static void init_kmem(void){
     int i;
 
-    kheap_start = (void*)0xFFFF800000400000;
+    kheap_start = 0xFFFF800000400000UL;
     kheap_end = kheap_start;
+    alloc_kheap(16);
+    MBLOCK_PREVTAG(kheap_start) = MBLOCK_TAG_USED;
 
     for(i = 0;i < 16;i++){
 	INIT_LIST_HEAD(kmem_free_list[i]);
     }
 }
-static void* expend_kheap(unsigned long size,unsigned long *ret_len){
-    void *ret = kheap_end;
-    unsigned long page;
-
-    if(size == 0){
-	return ret;
-    }
-    size = ((size - 1) & (~(PAGE_SIZE - 1))) + PAGE_SIZE;
-    if(ret_len != NULL){
-	*ret_len = size;
-    }
-
-    while(size > 0){
-	page = alloc_page();
-	map_page((unsigned long)kheap_end,(unsigned long)page);
-
-	kheap_end += PAGE_SIZE;
-	size -= PAGE_SIZE;
-    }
-
-    return ret;
-}
-void* kmalloc(unsigned long size){
+static get_free_head(unsigned long size){
     int i;
-    int j;
-    unsigned long block_size;
-    struct list_head *free_head;
-    struct mblock *block;
-    int find_flag;
 
-    block_size = size + MBLOCK_SIZE;
-    for(i = 14;i >= 0;i--){
-	if(block_size > kmem_free_size[i]){
+    for(i = 0;i < 15;i++){
+	if(size <= kmem_free_size[i]){
 	    break;
 	}
     }
-    i += 1;
 
-    free_head = &kmem_free_list[i];
-    if(i < 15){
-	if(list_empty(free_head)){
-	    block_size = kmem_free_size[i];
-	    block = (struct mblock*)expend_kheap(PAGE_SIZE,NULL);
+    return i;
+}
+static void merge_free_mblock(struct mblock **block){
+    struct mblock *close_block;
+    struct mblock *new_block;
 
-	    for(j = (PAGE_SIZE / block_size) - 1;j >= 0;j--){
-		block->tag = block_size;
-		MBLOCK_TAILTAG(block,block_size) = block_size;
-		list_add(&block->list,free_head);
+    list_del(&(*block)->list);
 
-		block = (struct mblock*)(((char*)block) + block_size);
-	    }
+    close_block = *block;
+    while(!(MBLOCK_PREVTAG(close_block) & MBLOCK_TAG_USED)){
+	close_block = (struct mblock*)((char*)close_block -
+		(MBLOCK_PREVTAG(close_block) & MBLOCK_TAG_SIZE));
+	list_del(&close_block->list);
+    }
+    new_block = close_block;
+
+    close_block = *block;
+    while(!(MBLOCK_NEXTTAG(close_block) & MBLOCK_TAG_USED)){
+	close_block = (struct mblock*)((char*)close_block +
+		(close_block->tag & MBLOCK_TAG_SIZE));
+	list_del(&close_block->list);
+
+    new_block->tag = (unsigned long)close_block - (unsigned long)new_block +
+	(close_block->tag & MBLOCK_TAG_SIZE);
+    MBLOCK_TAILTAG(new_block) = new_block->tag;
+
+    *block = new_block;
+}
+
+void* kmalloc(unsigned long size){
+    int idx;
+
+    unsigned long block_size;
+    unsigned long old_size;
+    struct list_head *free_head;
+    struct mblock *block;
+    struct mblock *old_block;
+    int find_flag;
+
+    if(size == 0){
+	return NULL;
+    }
+    block_size = size + MBLOCK_SIZE;
+    block_size = ((block_size - 1UL) & (~63UL)) + 64UL; 
+    
+    find_flag = 0;
+    for(idx = 0;idx < 15;idx++){
+	if(size <= kmem_free_size[idx] && !list_empty(&kmem_free_list[idx])){
+	    find_flag = 1;
+	    break;
 	}
+    }
 
-	block = container_of(free_head->next,struct mblock,list);
-	block->tag |= MBLOCK_TAG_USED;
-	MBLOCK_TAILTAG(block,block_size) = block->tag;
-	list_del(free_head->next);
-    }else{
-	block = NULL;
-	find_flag = 0;
+    free_head = &kmem_free_list[idx];
+    if(find_flag == 0 && !list_empty(free_head)){
 	list_for_each_entry(block,free_head,list){
 	    if((block->tag & MBLOCK_TAG_SIZE) >= block_size){
 		find_flag = 1;
 		break;
 	    }
 	}
-	if(!find_flag){
-	    block = (struct mblock*)expend_kheap(block_size,&block_size);
-	    block->tag = block_size | MBLOCK_TAG_USED;
-	    MBLOCK_TAILTAG(block,block_size) = block->tag;
+    }
+
+    if(find_flag == 0){
+	block = (struct mblock*)alloc_kheap(block_size);
+	block->tag = block_size | MBLOCK_TAG_USED;
+	MBLOCK_TAILTAG(block) = block->tag;
+	INIT_LIST_HEAD(block->list);
+    }else{
+	block = container_of(free_head->next,struct mblock,list);
+	list_del(&block->list);
+
+	old_size = block->tag & MBLOCK_TAG_SIZE;
+	old_size -= block_size;
+	if(old_size > 0){
+	    old_block = (struct mblock*)(((char*)block) + block_size);
+
+	    old_block->tag = old_size;
+	    MBLOCK_TAILTAG(old_block) = old_block->tag;
+	    
+	    list_add(&old_block->list,&kmem_free_list[get_free_head(old_size)]);
 	}
+	
+	block->tag = block_size;
+	MBLOCK_TAILTAG(block) = block->tag;
     }
 
     return (void*)(((char*)block) + sizeof(struct mblock));
+}
+void kfree(void *ptr){
+    struct mblock *block;
+    struct list_head *free_head;
+
+    block = (struct mblock*)(((char*)ptr) - sizeof(struct mblock));
+    block->tag &= ~MBLOCK_TAG_USED;
+    MBLOCK_TAILTAG(block) = block->tag;
+
+    merge_free_mblock(&block);
+
+    free_head = &kmem_free_list[get_free_head(block->tag & MBLOCK_TAG_SIZE)];
+    list_add(&block->list,free_head);
 }
 
 void init_mm(void){

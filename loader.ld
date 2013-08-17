@@ -1,5 +1,4 @@
 OUTPUT_FORMAT(binary)
-ENTRY (entry)
 SECTIONS{
     . = 0x0;
     .entry 0x7C00:{
