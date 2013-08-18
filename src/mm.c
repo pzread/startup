@@ -250,6 +250,7 @@ static void merge_free_mblock(struct mblock **block){
 	close_block = (struct mblock*)((char*)close_block +
 		(close_block->tag & MBLOCK_TAG_SIZE));
 	list_del(&close_block->list);
+    }
 
     new_block->tag = (unsigned long)close_block - (unsigned long)new_block +
 	(close_block->tag & MBLOCK_TAG_SIZE);

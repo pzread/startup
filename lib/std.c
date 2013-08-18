@@ -28,6 +28,44 @@ void memset(void *dst,char value,unsigned long size){
 	size -= sizeof(unsigned char);
     }
 }
+int memcmp(void *dst,void *src,unsigned long size){
+    while(size > sizeof(unsigned long)){
+	if(*(unsigned long*)(((unsigned char*)dst) +
+		    size - sizeof(unsigned long)) !=
+		*(unsigned long*)(((unsigned char*)src) +
+		    size - sizeof(unsigned long))){
+
+	    return 0;
+	}
+	size -= sizeof(unsigned long);
+    }
+    while(size > 0){
+	if(*(((unsigned char*)dst) + size -1) !=
+		*(((unsigned char*)src + size - 1))){
+
+	    return 0;
+	}
+	size--;
+    }
+
+    return 1;
+}
+void memcpy(void *dst,void *src,unsigned long size){
+    while(size > sizeof(unsigned long)){
+	*(unsigned long*)(((unsigned char*)dst) +
+		size - sizeof(unsigned long)) =
+	    *(unsigned long*)(((unsigned char*)src) +
+		size - sizeof(unsigned long));
+
+	size -= sizeof(unsigned long);
+    }
+    while(size > 0){
+	*(((unsigned char*)dst) + size - 1) =
+	    *(((unsigned char*)src) + size - 1);
+
+	size--;
+    }
+}
 
 void video_drawchar(int x,int y,char c){
     int i;

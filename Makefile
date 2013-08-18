@@ -1,4 +1,4 @@
-CC = ~/devel/gcc/gcc/bin/gcc
+CC = gcc
 CFLAGS32 = -masm=intel -fno-builtin -fno-zero-initialized-in-bss -I include -O2
 CFLAGS = $(CFLAGS32) -mcmodel=large
 LD = ld
