@@ -23,7 +23,8 @@ struct vbe_info_block{
 };
 struct mode_info_block{
     unsigned short mode_attributes;
-    char pad_a[16];
+    char pad_a[14];
+    unsigned short bytes_per_scanlien;
     unsigned short x_resolution;
     unsigned short y_resolution;
     char pad_b[3];
@@ -149,6 +150,7 @@ static void init_video(void){
     vga_info->x_res = mode_info.x_resolution;
     vga_info->y_res = mode_info.y_resolution;
     vga_info->bits = mode_info.bits_per_pixel;
+    vga_info->bytes_per_scanline = mode_info.bytes_per_scanline;
 
     asm volatile(
 	"push ebp\n"

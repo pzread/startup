@@ -53,6 +53,7 @@ struct vga_info{
     unsigned int x_res;
     unsigned int y_res;
     unsigned int bits;
+    unsigned int bytes_per_scanline;
 };
 struct mem_region{
     unsigned long long base;
