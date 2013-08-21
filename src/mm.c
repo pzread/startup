@@ -25,20 +25,6 @@
 #define PT_PML_TABLE ((unsigned long*)PT_BASE)
 #define PT_SET_ENTRY(e,x,f) (e) = ((unsigned long)(x) & 0x7FFFFFFFF000UL) | (unsigned long)((f) | PT_FLAG_P)
 
-/*
-Memory Block
-
-#Tag
-#List_head
-#Payload
-#Tag
-
-Tag: Size + low 2bit for tag
-
-Memort Free list
-64B ~ 65536B,> 65536B
-*/
-
 struct mblock{
     unsigned long tag;
     struct list_head list;
@@ -150,8 +136,8 @@ int map_page(unsigned long dst,unsigned long src){
     unsigned short pdpte_idx;
     unsigned short pde_idx;
     unsigned long entry;
-    unsigned long *pdpte;
-    unsigned long *pde;
+    __volatile__ unsigned long *pdpte;
+    __volatile__ unsigned long *pde;
 
     pml_idx = (dst & 0xFF8000000000UL) >> 39UL;
     pdpte_idx = (dst & 0x7FC0000000UL) >> 30UL;
@@ -164,6 +150,11 @@ int map_page(unsigned long dst,unsigned long src){
 	}
 	PT_SET_ENTRY(entry,pdpte,PT_FLAG_RW);
 	PT_PML_TABLE[pml_idx] = entry;
+
+	__asm__ __volatile__(	//Invalidate TLB, reload PDPTE registers
+	    "mov rax,cr3\n"
+	    "mov cr3,rax\n"
+	:::"rax");
     }else{
 	//Direct translate phys to virtual
 	pdpte = (unsigned long*)(entry & 0xFFFFFFFFF000 | 0xFFFF800000000000);
@@ -181,7 +172,7 @@ int map_page(unsigned long dst,unsigned long src){
     }
     
     PT_SET_ENTRY(pde[pde_idx],src & 0xFFFFFFE00000,PT_FLAG_PS | PT_FLAG_RW);
-
+    
     return 0;
 }
 
@@ -338,13 +329,13 @@ void init_mm(void){
     init_table();
     alloc_table();  //Alloc PML table
 
-    map_page(0xFFFF800000000000,0);  //Init 4M
+    map_page(0xFFFF800000000000,0);  //Init 4M memory
     map_page(0xFFFF800000000000 + PAGE_SIZE,PAGE_SIZE);
 
     __asm__ __volatile__(
 	"mov rax,%0\n"
 	"mov cr3,rax\n"
-    ::"i"(PT_BASE & 0x7FFFFFFFF000UL):"rax","memory");
+    ::"i"(PT_BASE & 0x7FFFFFFFF000):"rax","memory");
 
     init_kmem();
 }

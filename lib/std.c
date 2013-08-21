@@ -1,7 +1,5 @@
 #include<loader.h>
 
-#define vga_info ((struct vga_info*)VGA_INFO)
-
 static char *log_prefix = "[startup kernel] ";
 static int log_last_pos = 8;
 
@@ -67,42 +65,6 @@ void memcpy(void *dst,void *src,unsigned long size){
     }
 }
 
-void video_drawchar(int x,int y,char c){
-    int i;
-    int j;
-    int off;
-    unsigned char *vmem;
-    unsigned char *vchar;
-    unsigned char data;
-
-    vmem = (unsigned char*)(unsigned long)vga_info->vmem_base;
-    vchar = (unsigned char*)(VFONT_BASE + (unsigned long)c * 16UL);
-
-    for(i = 0;i < 16;i++){
-	off = (x + (y + i) * vga_info->x_res) * 3;
-	data = vchar[i];
-	for(j = 0;j < 8;j++){
-	    if((data & 0x80) == 0){
-		vmem[off] = 0x00;
-		vmem[off + 1] = 0x00;
-		vmem[off + 2] = 0x00;		
-	    }else{
-		vmem[off] = 0xE9;
-		vmem[off + 1] = 0xE9;
-		vmem[off + 2] = 0xE9;		
-	    }
-	    off += 3;
-	    data = data << 1;
-	}
-    }
-}
-void video_drawtext(int x,int y,char *str){
-    while(*str != '\0'){
-	video_drawchar(x,y,*str);
-	x += 8;
-	str++;
-    }
-}
 void std_sreverse(char *str,int len){
     int i;
     char tmp;
@@ -162,7 +124,7 @@ void sprintf(char *str,char *fmt,unsigned long *args){
 }
 
 void log(char *msg){
-    video_drawtext(8,log_last_pos,log_prefix);
-    video_drawtext(8 + 8 * 17,log_last_pos,msg);
+    graphic_drawtext(8,log_last_pos,log_prefix);
+    graphic_drawtext(8 + 8 * 17,log_last_pos,msg);
     log_last_pos += 16;
 }

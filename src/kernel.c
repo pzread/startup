@@ -34,17 +34,19 @@ int test_mm(){
     return 0;
 }
 
-__attribute__ ((section (".entry")))
 void main(void){
     init_mm();
     map_page(vga_info->vmem_base,vga_info->vmem_base);
-
     log("Enter x86-64 long mode");
     log("Memory Management init");
     log("Video memory map init");
 
     test_mm();
-    log("Memory Management test");
+    log("Memtest done");
+
+    log("Hello UEFI");
 
     while(1);
 }
+
+

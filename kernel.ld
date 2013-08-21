@@ -1,8 +1,10 @@
 OUTPUT_FORMAT(binary)
 SECTIONS{
     . = 0x0;
-    .kernel 0xFFFF800000010000:{
-	kernel.o(.entry)
-	*(COMMON)
+    .entry 0xF000: AT (0x0){
+	kernel_entry.o(*)
+    }
+    .kernel 0xFFFF800000010000: AT (0x1000){
+	*.o(*)
     }
 }
