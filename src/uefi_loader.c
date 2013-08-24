@@ -4,6 +4,10 @@
 #include<efiprot.h>
 #include<loader.h>
 
+#define EFI_ACPI_TABLE_GUID {0xeb9d2d30,0x2d88,0x11d3, \
+    {0x9a,0x16,0x0,0x90,0x27,0x3f,0xc1,0x4d}}
+#define EFI_ACPI_20_TABLE_GUID {0x8868e871,0xe4f1,0x11d3, \
+    {0xbc,0x22,0x0,0x80,0xc7,0x3c,0x88,0x81}}
 #define EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID {0x0964e5b22,0x6459,0x11d2, \
     {0x8e,0x39,0x00,0xa0,0xc9,0x69,0x72,0x3b}}
 
@@ -41,6 +45,45 @@ struct gdt_ptr{
 };
 
 #pragma pack(pop)
+
+static int memcmp(void *dst,void *src,unsigned long size){
+    while(size > sizeof(unsigned long)){
+	if(*(unsigned long*)(((unsigned char*)dst) +
+		    size - sizeof(unsigned long)) !=
+		*(unsigned long*)(((unsigned char*)src) +
+		    size - sizeof(unsigned long))){
+
+	    return 1;
+	}
+	size -= sizeof(unsigned long);
+    }
+    while(size > 0){
+	if(*(((unsigned char*)dst) + size -1) !=
+		*(((unsigned char*)src + size - 1))){
+
+	    return 1;
+	}
+	size--;
+    }
+
+    return 0;
+}
+void memcpy(void *dst,void *src,unsigned long size){
+    while(size > sizeof(unsigned long)){
+	*(unsigned long*)(((unsigned char*)dst) +
+		size - sizeof(unsigned long)) =
+	    *(unsigned long*)(((unsigned char*)src) +
+		size - sizeof(unsigned long));
+
+	size -= sizeof(unsigned long);
+    }
+    while(size > 0){
+	*(((unsigned char*)dst) + size - 1) =
+	    *(((unsigned char*)src) + size - 1);
+
+	size--;
+    }
+}
 
 static unsigned int *tmp;
 static void init_graphic(EFI_BOOT_SERVICES *boot_service){
@@ -138,6 +181,32 @@ static void init_graphic(EFI_BOOT_SERVICES *boot_service){
     if(find_mode == (UINT32)-1){
 	while(1);
     }
+}
+static void init_rsdp(EFI_SYSTEM_TABLE *system_table){
+    int i;
+
+    EFI_CONFIGURATION_TABLE *conf_table;
+    EFI_GUID acpi1_guid = EFI_ACPI_TABLE_GUID;
+    EFI_GUID acpi2_guid = EFI_ACPI_20_TABLE_GUID;
+    struct rsdp *rsdp;
+
+    rsdp = NULL;
+    conf_table = system_table->ConfigurationTable;
+    for(i = 0;i < system_table->NumberOfTableEntries;i++){
+	if(!memcmp(&conf_table[i].VendorGuid,&acpi2_guid,sizeof(EFI_GUID))){
+	    rsdp = conf_table[i].VendorTable;
+	    break;
+	}    
+	if(!memcmp(&conf_table[i].VendorGuid,&acpi1_guid,sizeof(EFI_GUID))){
+	    rsdp = conf_table[i].VendorTable;
+	}
+    }
+
+    if(rsdp == NULL){
+	while(1);
+    }
+    
+    memcpy((void*)RSDP_INFO,rsdp,sizeof(struct rsdp));
 }
 static void init_kernel(EFI_BOOT_SERVICES *boot_service){
     UINTN size;
@@ -473,6 +542,7 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle,EFI_SYSTEM_TABLE *system_table){
     boot_service = system_table->BootServices;
 
     init_graphic(boot_service);
+    init_rsdp(system_table);
     init_kernel(boot_service);
 
     init_resource(boot_service);

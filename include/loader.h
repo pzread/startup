@@ -1,8 +1,9 @@
 /*
 
 Physical Memory
-0x500	    -	    0x50F	VGA Info
-0x510	    -	    0xB10	MEM Info
+0x500	    -	    0x513	VGA Info
+0x514	    -	    0xB14	MEM Info
+0xB15	    -	    0xB38	RSDP Info
 0x1000	    -	    0x77FF	TSS (104 * 256)
 0x78C0	    -	    0x85FF	Loader (2KB stack + 2KB loader)
 0x8600	    -	    0xA5FF	Descriptor table (8 * 1024)
@@ -14,9 +15,6 @@ Physical Memory
 
 Legacy Loader Init Map
 0x0	    -	    0x200000	=>  0x0		-	0x200000    		
-
-Kernel Entry
-0xFFFF800000010000
 
 */
 
@@ -33,6 +31,7 @@ Kernel Entry
 #define MAX_PROCESSOR 256
 #define VGA_INFO (0x500 + HIGH_OFFSET)
 #define MEM_INFO (0x514 + HIGH_OFFSET)
+#define RSDP_INFO (0xB15 + HIGH_OFFSET)
 #define TSS_BASE (0x1000 + HIGH_OFFSET)
 #define GDT_BASE (0x8600 + HIGH_OFFSET)
 #define IOMAP_BASE (0xC600 + HIGH_OFFSET)
@@ -63,6 +62,17 @@ struct mem_region{
 struct mem_info{
     unsigned char region_count;
     struct mem_region region[64];
+};
+struct rsdp{
+    unsigned long signature;
+    unsigned char checksum;
+    unsigned char oemid[6];
+    unsigned char revision;
+    unsigned int rsdt_base;
+    unsigned int length;
+    unsigned long xsdt_base;
+    unsigned char ext_checksum;
+    unsigned char reserved[3];
 };
 
 #pragma pack(pop)

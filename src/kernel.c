@@ -5,6 +5,7 @@
 #define vga_info ((struct vga_info*)VGA_INFO)
 
 extern void init_mm(void);
+extern void init_acpi(void);
 
 int test_mm(){
     char *ta,*tb,*tc;
@@ -34,6 +35,8 @@ int test_mm(){
     return 0;
 }
 
+static unsigned long args[3];
+static char str[64];
 void main(void){
     init_mm();
     map_page(vga_info->vmem_base,vga_info->vmem_base);
@@ -44,7 +47,27 @@ void main(void){
     test_mm();
     log("Memtest done");
 
+    init_acpi();
+
     log("Hello UEFI");
+    
+    int i;
+    struct mem_info *mem_info;
+    unsigned long base;
+    unsigned long size;
+    
+    mem_info = (struct mem_info*)MEM_INFO;
+    for(i = 0;i < mem_info->region_count;i++){
+	if(mem_info->region[i].type == 1){
+	    base = mem_info->region[i].base;
+	    size = mem_info->region[i].size;
+
+	    args[0] = base;
+	    args[1] = size;
+	    sprintf(str,"%x %x",args);
+	    log(str);
+	}
+    }
 
     while(1);
 }

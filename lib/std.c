@@ -33,7 +33,7 @@ int memcmp(void *dst,void *src,unsigned long size){
 		*(unsigned long*)(((unsigned char*)src) +
 		    size - sizeof(unsigned long))){
 
-	    return 0;
+	    return 1;
 	}
 	size -= sizeof(unsigned long);
     }
@@ -41,12 +41,12 @@ int memcmp(void *dst,void *src,unsigned long size){
 	if(*(((unsigned char*)dst) + size -1) !=
 		*(((unsigned char*)src + size - 1))){
 
-	    return 0;
+	    return 1;
 	}
 	size--;
     }
 
-    return 1;
+    return 0;
 }
 void memcpy(void *dst,void *src,unsigned long size){
     while(size > sizeof(unsigned long)){

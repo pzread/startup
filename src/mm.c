@@ -157,7 +157,7 @@ int map_page(unsigned long dst,unsigned long src){
 	:::"rax");
     }else{
 	//Direct translate phys to virtual
-	pdpte = (unsigned long*)(entry & 0xFFFFFFFFF000 | 0xFFFF800000000000);
+	pdpte = (unsigned long*)(entry & 0xFFFFFFFFF000UL | 0xFFFF800000000000UL);
     }
 
     entry = pdpte[pdpte_idx];
@@ -168,12 +168,40 @@ int map_page(unsigned long dst,unsigned long src){
 	PT_SET_ENTRY(entry,pde,PT_FLAG_RW);
 	pdpte[pdpte_idx] = entry;
     }else{
-	pde = (unsigned long*)(entry & 0xFFFFFFFFF000 | 0xFFFF800000000000);
+	pde = (unsigned long*)(entry & 0xFFFFFFFFF000UL | 0xFFFF800000000000UL);
     }
     
-    PT_SET_ENTRY(pde[pde_idx],src & 0xFFFFFFE00000,PT_FLAG_PS | PT_FLAG_RW);
+    PT_SET_ENTRY(pde[pde_idx],src & 0xFFFFFFE00000UL,PT_FLAG_PS | PT_FLAG_RW);
     
     return 0;
+}
+int map_pages(unsigned long dst,unsigned long src,unsigned long size){
+    int ret;
+
+    dst = dst & ~(PAGE_SIZE - 1);
+    size += PAGE_SIZE - (src & (PAGE_SIZE - 1));
+    src = src & ~(PAGE_SIZE - 1);
+
+    while(size >= PAGE_SIZE){
+	if((ret = map_page(dst,src))){
+	    goto err;
+	}
+	dst += PAGE_SIZE;
+	src += PAGE_SIZE;
+	size -= PAGE_SIZE;
+    }
+    if(size > 0){
+	if((ret = map_page(dst,src))){
+	    goto err;
+	}
+    }
+    
+    return 0;
+
+err:
+
+    return ret;
+
 }
 
 static void* alloc_kheap(unsigned long size){
@@ -181,19 +209,23 @@ static void* alloc_kheap(unsigned long size){
     unsigned long page;
     unsigned long end;
 
+    ret = (void*)kheap_start;
+
     if(size == 0){
 	return ret;
     }
     size = ((size - 1UL) & (~15UL)) + 16UL;
 
     end = kheap_start + size + sizeof(unsigned long);
+    if(end > KERNEL_HEAP_END){
+	return NULL;
+    }
     while(kheap_end < end){
 	page = alloc_page();
 	map_page(kheap_end,(unsigned long)page);
 	kheap_end += PAGE_SIZE;
     }
 
-    ret = (void*)kheap_start;
     kheap_start += size;
     *(unsigned long*)kheap_start = MBLOCK_TAG_USED;
     
@@ -202,7 +234,7 @@ static void* alloc_kheap(unsigned long size){
 static void init_kmem(void){
     int i;
 
-    kheap_start = 0xFFFF800000400000UL;
+    kheap_start = KERNEL_HEAP_START;
     kheap_end = kheap_start;
     alloc_kheap(16);
     MBLOCK_PREVTAG(kheap_start) = MBLOCK_TAG_USED;
