@@ -1,3 +1,5 @@
+#include<config.h>
+
 extern void main(void);
 
 void entry(void){
@@ -33,6 +35,9 @@ void entry(void){
 	"mov cr3,rax\n"
     ::"g"(pml):"rax");
 
-    __asm__ __volatile__("mov rsp,0xFFFF800000007DC0\n");
+    __asm__ __volatile__(
+	"mov rsp,%0\n"
+    ::"i"(HIGH_OFFSET | 0x7DC0):);
+
     main();
 }

@@ -1,6 +1,8 @@
+#include<config.h>
 #include<mm.h>
 #include<std.h>
 #include<loader.h>
+#include<acpi.h>
 
 #define MAP_RSDT KERNEL_MAP_ACPI
 #define MAP_XSDT KERNEL_MAP_ACPI
@@ -69,6 +71,11 @@ struct madt_ioapic{
 
 #pragma pack(pop)
 
+unsigned int processor_num;
+struct processor processor[MAX_PROCESSOR];
+unsigned long lapic_base;
+unsigned long ioapic_base;
+
 unsigned long args[2];
 char str[64];
 
@@ -79,22 +86,23 @@ static void init_apic(struct madt* madt){
     struct madt_lapic *lapic;
     struct madt_ioapic *ioapic;
 
+    processor_num = 0;
+    lapic_base = madt->lic_base;
+
     base = (unsigned char*)madt + sizeof(*madt);
     end = (unsigned long)madt + madt->desc_header.length;
     while((unsigned long)base < end){
 	switch(base[0]){
 	    case APIC_TYPE_LAPIC:
-		lapic = (struct lapic*)base;
-		args[0] = lapic->apic_id;
-		sprintf(str,"LAPIC %u",args);
-		log(str);
+		lapic = (struct madt_lapic*)base;
+
+		processor_num += 1;
+		processor[lapic->apic_id].apic_id = lapic->apic_id;
 
 		break;
 	    case APIC_TYPE_IOAPIC:
-		ioapic = (struct ioapic*)base;
-		args[0] = ioapic->ioapic_base;
-		sprintf(str,"IOAPIC %x",args);
-		log(str);
+		ioapic = (struct madt_ioapic*)base;
+		ioapic_base = ioapic->ioapic_base;
 
 		break;
 	}

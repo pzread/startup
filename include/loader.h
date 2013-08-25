@@ -7,7 +7,7 @@ Physical Memory
 0x1000	    -	    0x77FF	TSS (104 * 256)
 0x78C0	    -	    0x85FF	Loader (2KB stack + 2KB loader)
 0x8600	    -	    0xA5FF	Descriptor table (8 * 1024)
-0xA600	    -	    0xB5FF	ISR (16 * 256)
+0xA600	    -	    0xB5FF	IDT (16 * 256)
 0xC5E0	    -	    0xC5FF	Interrupt redirection bitmap
 0xC600	    -	    0xE600	IO bitmap (64Kb + 1B)
 0xF000	    -	    0x17000	Kernel (32KB)
@@ -18,23 +18,13 @@ Legacy Loader Init Map
 
 */
 
-#ifdef LOADER
-
-#define HIGH_OFFSET 0
-
-#else
-
-#define HIGH_OFFSET 0xFFFF800000000000UL
-
-#endif
-
-#define MAX_PROCESSOR 256
 #define VGA_INFO (0x500 + HIGH_OFFSET)
 #define MEM_INFO (0x514 + HIGH_OFFSET)
 #define RSDP_INFO (0xB15 + HIGH_OFFSET)
 #define TSS_BASE (0x1000 + HIGH_OFFSET)
 #define GDT_BASE (0x8600 + HIGH_OFFSET)
-#define IOMAP_BASE (0xC600 + HIGH_OFFSET)
+#define IDT_BASE (0xA600 + HIGH_OFFSET)
+#define IOMAP_BASE (0xC620 + HIGH_OFFSET)
 
 #define GDT_CODE 0x8
 #define GDT_DATA 0x10

@@ -35,5 +35,7 @@ kernel:
 	$(CC) $(CFLAGS) -m64 -c src/mm.c -o mm.o
 	$(CC) $(CFLAGS) -m64 -c src/graphic.c -o graphic.o
 	$(CC) $(CFLAGS) -m64 -c src/acpi.c -o acpi.o
-	$(LD) -m elf_x86_64 -T kernel.ld -o kernel.img entry.o kernel.o bitop.o list.o std.o mm.o graphic.o acpi.o
+	$(CC) $(CFLAGS) -m64 -c src/interrupt.c -o interrupt.o
+	nasm -f elf64 src/isr.asm -o isr.o
+	$(LD) -m elf_x86_64 -T kernel.ld -o kernel.img entry.o kernel.o bitop.o list.o std.o mm.o graphic.o acpi.o interrupt.o isr.o
 	$(PAD) kernel.img 32768

@@ -1,3 +1,4 @@
+#include<config.h>
 #include<loader.h>
 
 static char *log_prefix = "[startup kernel] ";

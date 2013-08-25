@@ -1,3 +1,4 @@
+#include<config.h>
 #include<std.h>
 #include<list.h>
 #include<bitop.h>
@@ -5,13 +6,13 @@
 #include<err.h>
 #include<loader.h>
 
-#define PT_PAGEMAP 0xFFFF8000001E8000UL
+#define PT_PAGEMAP (HIGH_OFFSET | 0x1E8000UL)
 #define PT_PAGEMAP_SIZE 32768UL
 #define PT_MAX_PAGE (PT_PAGEMAP_SIZE * 8UL)
 
-#define PT_TABLEMAP 0xFFFF8000001F0000UL
+#define PT_TABLEMAP (HIGH_OFFSET | 0x1F0000UL)
 #define PT_TABLEMAP_SIZE 65536UL
-#define	PT_BASE 0xFFFF800000200000UL
+#define	PT_BASE (HIGH_OFFSET | 0x200000UL)
 #define PT_MAX_TABLE 512UL
 #define PT_TABLE_SIZE 4096UL
 
@@ -23,7 +24,9 @@
 #define PT_FLAG_XD 0x8000000000000000UL
 
 #define PT_PML_TABLE ((unsigned long*)PT_BASE)
-#define PT_SET_ENTRY(e,x,f) (e) = ((unsigned long)(x) & 0x7FFFFFFFF000UL) | (unsigned long)((f) | PT_FLAG_P)
+#define PT_SET_ENTRY(e,x,f) \
+    (e) = ((unsigned long)(x) & (LOW_MASK ^ 0xFFFUL)) | \
+    (unsigned long)((f) | PT_FLAG_P)
 
 struct mblock{
     unsigned long tag;
@@ -157,7 +160,7 @@ int map_page(unsigned long dst,unsigned long src){
 	:::"rax");
     }else{
 	//Direct translate phys to virtual
-	pdpte = (unsigned long*)(entry & 0xFFFFFFFFF000UL | 0xFFFF800000000000UL);
+	pdpte = (unsigned long*)(entry & 0xFFFFFFFFF000UL | HIGH_OFFSET);
     }
 
     entry = pdpte[pdpte_idx];
@@ -168,7 +171,7 @@ int map_page(unsigned long dst,unsigned long src){
 	PT_SET_ENTRY(entry,pde,PT_FLAG_RW);
 	pdpte[pdpte_idx] = entry;
     }else{
-	pde = (unsigned long*)(entry & 0xFFFFFFFFF000UL | 0xFFFF800000000000UL);
+	pde = (unsigned long*)(entry & 0xFFFFFFFFF000UL | HIGH_OFFSET);
     }
     
     PT_SET_ENTRY(pde[pde_idx],src & 0xFFFFFFE00000UL,PT_FLAG_PS | PT_FLAG_RW);
@@ -361,13 +364,13 @@ void init_mm(void){
     init_table();
     alloc_table();  //Alloc PML table
 
-    map_page(0xFFFF800000000000,0);  //Init 4M memory
-    map_page(0xFFFF800000000000 + PAGE_SIZE,PAGE_SIZE);
+    map_page(HIGH_OFFSET,0);  //Init 4M memory
+    map_page(HIGH_OFFSET + PAGE_SIZE,PAGE_SIZE);
 
     __asm__ __volatile__(
 	"mov rax,%0\n"
 	"mov cr3,rax\n"
-    ::"i"(PT_BASE & 0x7FFFFFFFF000):"rax","memory");
+    ::"i"(PT_BASE & (LOW_MASK ^ 0xFFFUL)):"rax","memory");
 
     init_kmem();
 }

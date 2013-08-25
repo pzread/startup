@@ -1,3 +1,4 @@
+#include<config.h>
 #include<std.h>
 #include<loader.h>
 #include<mm.h>
@@ -6,6 +7,7 @@
 
 extern void init_mm(void);
 extern void init_acpi(void);
+extern void init_interrput(void);
 
 int test_mm(){
     char *ta,*tb,*tc;
@@ -48,6 +50,7 @@ void main(void){
     log("Memtest done");
 
     init_acpi();
+    init_interrupt();
 
     log("Hello UEFI");
     
@@ -71,5 +74,3 @@ void main(void){
 
     while(1);
 }
-
-

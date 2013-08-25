@@ -2,6 +2,7 @@
 
 #include<efi.h>
 #include<efiprot.h>
+#include<config.h>
 #include<loader.h>
 
 #define EFI_ACPI_TABLE_GUID {0xeb9d2d30,0x2d88,0x11d3, \
@@ -41,7 +42,7 @@ typedef struct _EFI_FILE_PROTOCOL{
 
 struct gdt_ptr{
     unsigned short limit;
-    unsigned long long base;
+    unsigned long base;
 };
 
 #pragma pack(pop)
@@ -301,7 +302,7 @@ static void init_kernel(EFI_BOOT_SERVICES *boot_service){
 	    (EFI_PHYSICAL_ADDRESS)handle,
 	    pages);
 }
-static void init_resource(EFI_BOOT_SERVICES *boot_service){
+/*static void init_resource(EFI_BOOT_SERVICES *boot_service){
     UINTN size;
     UINTN pages;
     EFI_HANDLE *handle;
@@ -393,7 +394,7 @@ static void init_resource(EFI_BOOT_SERVICES *boot_service){
 	    2,
 	    (EFI_PHYSICAL_ADDRESS)handle,
 	    pages);
-}
+}*/
 static void init_memory_and_exit(
 	EFI_BOOT_SERVICES *boot_service,
 	EFI_HANDLE image_handle){
@@ -535,7 +536,7 @@ void prepare_kernel(EFI_RUNTIME_SERVICES *runtime_service){
 }
 
 EFI_STATUS efi_main(EFI_HANDLE image_handle,EFI_SYSTEM_TABLE *system_table){
-    int i,j,k;
+    //int i,j,k;
 
     EFI_BOOT_SERVICES *boot_service;
 
@@ -545,14 +546,14 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle,EFI_SYSTEM_TABLE *system_table){
     init_rsdp(system_table);
     init_kernel(boot_service);
 
-    init_resource(boot_service);
+    /*init_resource(boot_service);
     k = 0;
     for(i = 0;i < 768;i++){
 	for(j = 0;j < 512;j++){
 	    ((unsigned long*)tmp)[i * 512 + j] = ((unsigned long*)0x400000)[k]; 
 	    k++;
 	}
-    }
+    }*/
 
     init_memory_and_exit(boot_service,image_handle);
     prepare_kernel(system_table->RuntimeServices);

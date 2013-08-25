@@ -2,7 +2,8 @@ __asm__(".code16gcc\n");
 
 #define LOADER
 
-#include <loader.h>
+#include<config.h>
+#include<loader.h>
 
 #define GET_WORDPTR(p,v) __asm__ __volatile__("push es\nmov edi,%1\nand edi,0xFFFF0000\nshr edi,4\nmov es,di\nmov edi,%1\nmov %0,WORD PTR es:[di]\npop es\n":"=g"(v):"g"(p):"edi")
 #define SET_DWORDPTR(p,v) __asm__ __volatile__("push es\nmov edi,%0\nand edi,0xFFFF0000\nshr edi,4\nmov es,di\nmov edi,%0\nmov DWORD PTR es:[di],%1\npop es\n"::"g"(p),"g"(v):"edi")

@@ -1,3 +1,4 @@
+#include<config.h>
 #include<font.h>
 #include<graphic.h>
 #include<loader.h>
@@ -22,9 +23,9 @@ void graphic_drawtext(unsigned int x,unsigned int y,char *text){
 	    data = vchar[i];
 	    for(j = 0;j < 8;j++){
 		if((data & 0x80) == 0x80){
-		    vmem[off] = 0x0C;
-		    vmem[off + 1] = 0x0C;
-		    vmem[off + 2] = 0x0C;		
+		    vmem[off] = 0xD9;
+		    vmem[off + 1] = 0xD9;
+		    vmem[off + 2] = 0xD9;		
 		}
 		off += 4;
 		data = data << 1;
